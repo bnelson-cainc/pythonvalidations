@@ -7,7 +7,7 @@ import os.path
 from ireadydbmodule import *
 #import pdb
 
-EXCEL_FILENAME = "/Users/bnelson/Downloads/Release8-6_NewLesson Master_02_22_18_B.xlsx"
+EXCEL_FILENAME = "/Users/bnelson/Downloads/Release8-6_NewLesson Master_02_22_18_E.xlsx"
 
 FILE_KEY_1 = 'Lesson'
 FILE_KEY_2 = 'Master'
@@ -47,8 +47,8 @@ def isPhoenixLesson(lessonId):
 
 # Return True if this Phoenix domain is one of those that are an exception to the
 # mismatch error we normally produce; in other words, if the Phoenix lesson has
-# one of the domains in the exceptions array, only issue a warning if the domain
-# isn't a perfect substring of the lesson id.
+# one of the domains in the exceptions array, issue a warning (instead of an error)
+# if the domain isn't a perfect substring of the lesson id.
 def isDomainMismatchWarning(lessonId, domain):
 	if isPhoenixLesson(lessonId) and domain in DOMAIN_EXCEPTIONS:
 		return True
@@ -77,7 +77,7 @@ def getPhoenixSwfFileName(lessonId):
 
 	return newSwfFileName
 	
-	
+# Initialize some variables.
 
 row_num = 1
 problems = 0
@@ -86,31 +86,37 @@ lesson_ids_from_spreadsheet_array = []
 lesson_ids_array = []
 sequence_array = []
 
+# Examine just the file name without the path.
 file_only = os.path.basename(EXCEL_FILENAME)
 
+# If there's no space, we don't have to do any more checking.
 if ' ' not in file_only:
 	print "There's no space in the filename, there HAS to be a space between " + FILE_KEY_1 + " and " + FILE_KEY_2 + "."
 	print "Here's the filename found:  >" + file_only + "<"
 	sys.exit()
 
+# Ensure the string "Lesson Master" (exactly like that) is in the file name somewhere.
 if REQUIRED_SUBSTRING not in file_only:
 	print "The substring of '" + REQUIRED_SUBSTRING + "' must exist in the filename, but doesn't; this file won't import: " + file_only
 	sys.exit()
 
 # Validate first sheet (main sheet).
 
+# Oh yeah, and the path/file ought to exist!
 if not os.path.exists(EXCEL_FILENAME):
 	print "Unable to open file named '" + EXCEL_FILENAME + "', please check the name and try again."
 	sys.exit()
 
 
+# Crack open the workbook.
 workbook = xlrd.open_workbook(EXCEL_FILENAME, encoding_override="cp1252")
 
+# There better be 2 sheets inside!
 if workbook.nsheets != 2:
 	print "There must be exactly 2 sheets in the Excel spreadsheet."
 	sys.exit()
 
-# In case the sheet name changes, use indices.
+# In case the sheet name changes, use indices; sheet 1 is the Lesson sheet.
 #worksheet1 = workbook.sheet_by_name('New Lessons')
 worksheet1 = workbook.sheet_by_index(0)
 
@@ -234,6 +240,7 @@ if seq_probs > 0:
 
 print "Validating 2nd sheet (components)...."
 
+# Now start on sheet 2 (Components).
 #worksheet1 = workbook.sheet_by_name('Components')
 worksheet2 = workbook.sheet_by_index(1)
 
