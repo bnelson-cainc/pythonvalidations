@@ -5,9 +5,23 @@ import sys
 import xlrd  # sudo pip install xlrd
 import os.path
 from ireadydbmodule import *
+import argparse
 #import pdb
 
-EXCEL_FILENAME = "/Users/bnelson/Downloads/Release8-6_NewLesson Master_02_22_18_E.xlsx"
+#EXCEL_FILENAME = "/Users/bnelson/Downloads/Release8-6_NewLesson Master_031518C.xlsx"
+
+# Set up and parse command line arguments
+parser = argparse.ArgumentParser()
+parser.add_argument("filename", help = "Excel filename of reorder sheet to validate")
+parser.add_argument("--nowarn", help = "Do not print warnings, only reveal total warnings", action = "store_true")
+args = parser.parse_args()
+
+EXCEL_FILENAME = args.filename
+SUPPRESS_WARNINGS = args.nowarn
+
+if SUPPRESS_WARNINGS:
+	print "NOTE: Warning messages will be suppressed."
+
 
 FILE_KEY_1 = 'Lesson'
 FILE_KEY_2 = 'Master'
@@ -131,9 +145,9 @@ for row in range(1, worksheet1.nrows):
 	
 	if SPACE_CHAR not in sequence:
 		problems += 1
-		print "Row " + str(row_num) + " has a sequence with no space, sequence text = " + sequence
+		print "ERROR: Row " + str(row_num) + " has a sequence with no space, sequence text = " + sequence
 	else:
-		sequence_array.append([sequence, row_num])
+		sequence_array.append([lesson_id, sequence, row_num])
 
 	# Strip whitespace at right end of string for comparison below.
 	lesson_id2 = lesson_id.rstrip()
@@ -142,55 +156,57 @@ for row in range(1, worksheet1.nrows):
 	# Validate that there aren't any spaces at the end of the id or name/title.
 	if lesson_name != lesson_name2 or lesson_id != lesson_id2:
 		problems += 1
-		print "Row " + str(row_num) + " has a space at end of lesson name with id = " + lesson_id + " and name = >" + lesson_name + "<."
+		print "ERROR: Row " + str(row_num) + " has a space at end of lesson name with id = " + lesson_id + " and name = >" + lesson_name + "<."
 		
 	if '_' in lesson_id:
 		problems += 1
-		print "Row " + str(row_num) + " has an underscore in lesson id with id = " + lesson_id
+		print "ERROR: Row " + str(row_num) + " has an underscore in lesson id with id = " + lesson_id
 	
 	if len(lesson_name) > 255:
 		problems += 1
-		print "Row " + str(row_num) + " has a lesson name with length greater than 255 with lesson id = " + lesson_id
+		print "ERROR: Row " + str(row_num) + " has a lesson name with length greater than 255 with lesson id = " + lesson_id
 
 	if len(obj_text) > 512:
 		problems += 1
-		print "Row " + str(row_num) + " has an objective text with length greater than 512 with lesson id = " + lesson_id
+		print "ERROR: Row " + str(row_num) + " has an objective text with length greater than 512 with lesson id = " + lesson_id
 	
 	domainLen = len(domain)
 
 	# There's a few Phoenix lessons that don't fit this rule, ignore them with warnings.
 	if isDomainMismatchWarning(lesson_id, domain) and lesson_id[0 : domainLen] != domain:
 		warnings += 1
-		print "Row " + str(row_num) + " appears to have an incorrect domain in row with id = " + lesson_id + " and domain = " + domain + "."
+		if not SUPPRESS_WARNINGS:
+			print "WARNING: Row " + str(row_num) + " appears to have an incorrect domain in row with id = " + lesson_id + " and domain = " + domain + "."
 	# Validate that the domain is a perfect substr of the lesson id (it should be).	
 	elif lesson_id[0 : domainLen] != domain:
 		problems += 1
-		print "Row " + str(row_num) + " has incorrect domain in row with id = " + lesson_id + " and domain = " + domain + "."
+		print "ERROR: Row " + str(row_num) + " has incorrect domain in row with id = " + lesson_id + " and domain = " + domain + "."
 
 	# Validate the subject value (Reading or Math).		
 	if subject not in SUBJECT_VALUES:
 		problems += 1
-		print "Row " + str(row_num) + " with lesson id " + lesson_id + " has bad subject value [must be 'Reading' or 'Math']: " + subject
+		print "ERROR: Row " + str(row_num) + " with lesson id " + lesson_id + " has bad subject value [must be 'Reading' or 'Math']: " + subject
 		
 	# Validate the grade is a number (0-8).
 	if int(grade) not in GRADE_VALUES:
 		problems += 1
-		print "Row " + str(row_num) + " with lesson id " + lesson_id + " has bad grade value [must be a number]: " + grade
+		print "ERROR: Row " + str(row_num) + " with lesson id " + lesson_id + " has bad grade value [must be a number]: " + grade
 
 	# Validate that the year_level is one of the predefined values.
 	if year_level not in YEAR_LEVEL_VALUES:
 		problems += 1
-		print "Row " + str(row_num) + " with lesson id " + lesson_id + " has bad year level value: " + year_level
+		print "ERROR: Row " + str(row_num) + " with lesson id " + lesson_id + " has bad year level value: " + year_level
 
 	# Validate the lesson state.	
 	if lesson_state != LESSON_STATE_DEFAULT:
 		problems += 1
-		print "Row " + str(row_num) + " with lesson id " + lesson_id + " has bad lesson state (should be " + LESSON_STATE_DEFAULT + ") : " + lesson_state	
+		print "ERROR: Row " + str(row_num) + " with lesson id " + lesson_id + " has bad lesson state (should be " + LESSON_STATE_DEFAULT + ") : " + lesson_state	
 
 	# Validate the lesson type.
 	if lesson_type != LESSON_TYPE_DEFAULT:
 		problems += 1
-		print "Row " + str(row_num) + " with lesson id " + lesson_id + " has bad lesson type (should be " + LESSON_TYPE_DEFAULT + ") : " + lesson_type
+		print "ERROR: Row " + str(row_num) + " with lesson id " + lesson_id + " has bad lesson type (should be " + LESSON_TYPE_DEFAULT + ") : " + lesson_type
+	
 
 # Show results.
 if warnings > 0:
@@ -217,8 +233,9 @@ for row in rows:
 
 # Now go through all the sequences and ensure that all lesson id's referenced actually exist.
 for sequenceObj in sequence_array:
-	sequence = sequenceObj[0]
-	row_num = sequenceObj[1]
+	lesson_id = sequenceObj[0]
+	sequence = sequenceObj[1]
+	row_num = sequenceObj[2]
 	# The string is "Before <lesson id>" or "After <lesson id>".
 	seq_tokens = sequence.split(' ')
 	pref_text = seq_tokens[0]
@@ -226,11 +243,15 @@ for sequenceObj in sequence_array:
 	
 	if pref_text not in SEQUENCE_PREFIXES:
 		seq_probs += 1
-		print "Prefix text in Sequence column must be 'Before' or 'After', found: " + pref_text + " in line " + str(row_num)
+		print "ERROR: Prefix text in Sequence column must be 'Before' or 'After', found: " + pref_text + " in line " + str(row_num)
 	
+	if existing_lesson_id == lesson_id:
+		seq_probs += 1
+		print "ERROR: Lesson id in Sequence column '" + sequence + "' is equal to lesson_id column " + lesson_id + " in line " + str(row_num)
+
 	if existing_lesson_id not in lesson_ids_array:
 		seq_probs += 1
-		print "Supposedly existing lesson id " + existing_lesson_id + " not found from sequence " + sequence + " in line " + str(row_num)
+		print "ERROR: Supposedly existing lesson id " + existing_lesson_id + " not found from sequence " + sequence + " in line " + str(row_num)
 
 if seq_probs > 0:
 	print "There were " + str(seq_probs) + " sequence issues found, please correct and try again."
@@ -260,7 +281,7 @@ for row in range(1, worksheet2.nrows):
 	# Validate that the lesson id in this tab is also present in the first tab.
 	if lesson_id not in lesson_ids_from_spreadsheet_array:
 		problems2 += 1
-		print "Row " + str(row_num) + " has a lesson id '" + lesson_id + "' from Components Tab that was not referenced in first tab!"
+		print "ERROR: Row " + str(row_num) + " has a lesson id '" + lesson_id + "' from Components Tab that was not referenced in first tab!"
 
 	# Save this lesson id so we can do the opposite validation below.	
 	new_lesson_ids_array.append(lesson_id)
@@ -268,7 +289,7 @@ for row in range(1, worksheet2.nrows):
 	# Check the player link value.
 	if player_link not in PLAYER_LINKS:
 		problems2 += 1
-		print 'Row ' + str(row_num) + ' has an invalid player link: ' + player_link
+		print 'ERROR: Row ' + str(row_num) + ' has an invalid player link: ' + player_link
 
 	# Check the SWF file name value.  Phoenix lessons of course have to be different!  They use underscores in the SWF file name.
 	if isPhoenixLesson(lesson_id):
@@ -279,27 +300,27 @@ for row in range(1, worksheet2.nrows):
 		# that approximation is in the real SWF file name.
 		if phxSwfFileName not in swf_file_name:
 			problems2 += 1
-			print 'Row ' + str(row_num) + ' has an invalid Phoenix SWF file name: ' + swf_file_name + ' should contain: ' + phxSwfFileName
+			print 'ERROR: Row ' + str(row_num) + ' has an invalid Phoenix SWF file name: ' + swf_file_name + ' should contain: ' + phxSwfFileName
 	elif SWF_FILE_PREFIX + lesson_id != swf_file_name:
 		problems2 += 1
-		print 'Row ' + str(row_num) + ' has an invalid SWF file name: ' + swf_file_name + ' should be: ' + SWF_FILE_PREFIX + lesson_id
+		print 'ERROR: Row ' + str(row_num) + ' has an invalid SWF file name: ' + swf_file_name + ' should be: ' + SWF_FILE_PREFIX + lesson_id
 
 	# Check the Concat. URL SWF value.		
 	if concat_url_swf != '':
 		problems2 += 1
-		print 'Row ' + str(row_num) + ' has an invalid concat URL and SWF, MUST be empty: ' + concat_url_swf
+		print 'ERROR: Row ' + str(row_num) + ' has an invalid concat URL and SWF, MUST be empty: ' + concat_url_swf
 
 	# Check the component type value.
 	if component_type not in COMPONENTS:
 		problems2 += 1
-		print 'Row ' + str(row_num) + ' has an invalid component type: ' + component_type
+		print 'ERROR: Row ' + str(row_num) + ' has an invalid component type: ' + component_type
 
 	#pdb.set_trace()
 
 	# First check if the column was empty or all whitespace.
 	if not isinstance(component_order, float) and (len(component_order) == 0 or component_order.isspace()):
 		problems2 += 1
-		print 'Row ' + str(row_num) + ' has an empty component order, MUST be a number.'
+		print 'ERROR: Row ' + str(row_num) + ' has an empty component order, MUST be a number.'
 	else:
 		# Check the component order value.	Excel always reads in integers as floats,
 		# so convert to int() to get rid of '.0', and then convert to string to check
@@ -308,12 +329,12 @@ for row in range(1, worksheet2.nrows):
 		comp_order_str = str(component_order)	
 		if not comp_order_str.isdigit():
 			problems2 += 1
-			print 'Row ' + str(row_num) + ' has an invalid component order, MUST be a number: ' + comp_order_str
+			print 'ERROR: Row ' + str(row_num) + ' has an invalid component order, MUST be a number: ' + comp_order_str
 
 	# First check if the column was empty or all whitespace.
 	if not isinstance(estimated_time, float) and (len(estimated_time) == 0 or estimated_time.isspace()):
 		problems2 += 1
-		print 'Row ' + str(row_num) + ' has an empty estimated time, MUST be a number.'
+		print 'ERROR: Row ' + str(row_num) + ' has an empty estimated time, MUST be a number.'
 	else:
 		# Check the estimated time value. Excel always reads in integers as floats,
 		# so convert to int() to get rid of '.0', and then convert to string to check
@@ -322,14 +343,14 @@ for row in range(1, worksheet2.nrows):
 		est_time_str = str(estimated_time)
 		if not est_time_str.isdigit():
 			problems2 += 1
-			print 'Row ' + str(row_num) + ' has an invalid estimated time, MUST be a number (and NOT blank): ' + est_time_str
+			print 'ERROR: Row ' + str(row_num) + ' has an invalid estimated time, MUST be a number (and NOT blank): ' + est_time_str
 		
 
 # Lesson id's from the first tab must appear at least once in this tab; validate that here.
 for lessonid in lesson_ids_from_spreadsheet_array:
 	if lessonid not in new_lesson_ids_array:
 		problems2 += 1
-		print "Lesson id '" + lessonid + "' from first tab was not referenced in Components Tab!"
+		print "ERROR: Lesson id '" + lessonid + "' from first tab was not referenced in Components Tab!"
 
 if problems2 > 0:
 	print 'There were ' + str(problems2) + ' problems in the Components Sheet, please fix and retry.'
